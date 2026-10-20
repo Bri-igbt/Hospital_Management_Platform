@@ -1,1 +1,1 @@
-# Hospital_Management_sysyem-MediCare-
+# Hospital_Management_Platform

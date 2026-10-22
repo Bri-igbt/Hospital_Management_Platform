@@ -8,7 +8,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// to upload files to cloudinary
+// TO UPLOAD FILES TO CLOUDINARY
 export async function uploadToCloudinary( filePath, folder = "Doctor" ) {
   try {
     const result = await cloudinary.uploader.upload(filePath, {
@@ -26,7 +26,7 @@ export async function uploadToCloudinary( filePath, folder = "Doctor" ) {
   }
 };
 
-// to delete an image that is present in cloudinary if user removes from the UI
+// TO DELETE FILE THATS ALREADY IN CLOUDINARY
 export async function deleteFromCloudinary(publicId) {
   try {
     if (!publicId) return

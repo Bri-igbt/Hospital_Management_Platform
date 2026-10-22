@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^2.1.80",
+    "bcryptjs": "^3.0.3",
     "body-parser": "^2.3.0",
     "cloudinary": "^2.11.0",
     "cors": "^2.8.6",

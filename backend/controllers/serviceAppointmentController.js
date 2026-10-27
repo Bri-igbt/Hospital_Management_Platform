@@ -11,9 +11,10 @@ const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
-const CURRENCY = (process.env.PAYMENT_CURRENCY || "inr").toLowerCase();
+const CURRENCY = (process.env.PAYMENT_CURRENCY || "ngn").toLowerCase();
 const GENDERS = ["Male", "Female", "Other"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 
 const safeNumber = (val) => {
   if (val === undefined || val === null || val === "") return null;
@@ -53,7 +54,7 @@ const buildFrontendBase = (req) => {
     try {
       return new URL(referer).origin;
     } catch {
-
+      /* ignore */
     }
   }
   return null;
@@ -92,7 +93,6 @@ function resolveSlot({ time, hour, minute, ampm }) {
   if (h < 1 || h > 12 || m < 0 || m > 59) return null;
   return { hour: h, minute: m, ampm: ap };
 }
-
 
 const formatSlot = (slot) =>
   `${pad2(slot.hour)}:${pad2(slot.minute)} ${slot.ampm}`;
@@ -149,18 +149,21 @@ export const createServiceAppointment = async (req, res) => {
         message: "A valid serviceId is required",
       });
     }
+
     if (!patientName || !String(patientName).trim()) {
       return res.status(400).json({
         success: false,
         message: "patientName is required",
       });
     }
+
     if (!mobile || !String(mobile).trim()) {
       return res.status(400).json({
         success: false,
         message: "mobile is required",
       });
     }
+
     if (!date || !DATE_RE.test(String(date))) {
       return res.status(400).json({
         success: false,
@@ -296,6 +299,7 @@ export const createServiceAppointment = async (req, res) => {
           meta,
         },
       });
+
       return res.status(201).json({
         success: true,
         appointment: created,
@@ -380,6 +384,7 @@ export const createServiceAppointment = async (req, res) => {
       appointment: created,
       checkoutUrl: session.url || null,
     });
+
   } catch (error) {
     console.error("createServiceAppointment Error:", error);
     return res.status(500).json({
@@ -643,10 +648,9 @@ export const updateServiceAppointment = async (req, res) => {
       const hasTime = Boolean(time) || hour !== undefined;
 
       if (!date && !hasTime) {
-        return res.status(400).json({
-          success: false,
-          message: "A new date or time is required",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "A new date or time is required" });
       }
       if (date && !DATE_RE.test(String(date))) {
         return res.status(400).json({
@@ -689,9 +693,10 @@ export const updateServiceAppointment = async (req, res) => {
     }
 
     if (Object.keys(updates).length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Nothing to update" });
+      return res.status(400).json({
+        success: false,
+        message: "Nothing to update",
+      });
     }
 
     const updated = await ServiceAppointment.findByIdAndUpdate(
@@ -700,10 +705,16 @@ export const updateServiceAppointment = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    return res.status(200).json({ success: true, data: updated });
+    return res.status(200).json({
+      success: true,
+      data: updated,
+    });
   } catch (error) {
     console.error("UpdateServiceAppointment Error:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 };
 
@@ -712,27 +723,33 @@ export const cancelServiceAppointment = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidId(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid appointment id" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment id",
+      });
     }
 
     const userId = getUserId(req);
     if (!userId) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
     }
 
     const appt = await ServiceAppointment.findById(id);
     if (!appt) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Appointment not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
     }
 
     if (appt.createdBy !== userId && !isAdmin(userId)) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Not authorized" });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
     }
 
     if (appt.status === "Completed") {
@@ -754,7 +771,10 @@ export const cancelServiceAppointment = async (req, res) => {
     });
   } catch (error) {
     console.error("CancelServiceAppointment Error:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 };
 
@@ -818,14 +838,11 @@ export const getServiceAppointmentStats = async (req, res) => {
     });
   } catch (error) {
     console.error("GetServiceAppointmentStats Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server Error",
-    });
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
-// TO GET SERVICE APPOINTMENT BY PATIENT
+// GET SERVICE APPOINTMENT BY PATIENT
 export const getServiceAppointmentByPatient = async (req, res) => {
   try {
     const clerkUserId = getUserId(req);
@@ -842,7 +859,11 @@ export const getServiceAppointmentByPatient = async (req, res) => {
     const list = await ServiceAppointment.find(filter)
       .sort({ createdAt: -1 })
       .lean();
-    return res.status(200).json({ success: true, data: list });
+
+    return res.status(200).json({
+      success: true,
+      data: list,
+    });
   } catch (error) {
     console.error("GetServiceAppointmentByPatient Error:", error);
     return res.status(500).json({

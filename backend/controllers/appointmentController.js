@@ -9,7 +9,6 @@ dotenv.config();
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const FRONTEND_URL = process.env.FRONTEND_URL;
-const MAJOR_ADMIN_ID = process.env.MAJOR_ADMIN_ID || null;
 const CURRENCY = (process.env.PAYMENT_CURRENCY || "ngn").toLowerCase();
 
 const PENDING_HOLD_MINUTES = 30;
@@ -278,7 +277,7 @@ export const createAppointment = async (req, res) => {
       },
       notes: notes || "",
       createdBy: clerkUserId,
-      owner: doctor.owner || MAJOR_ADMIN_ID || String(doctor._id),
+      owner: doctor.owner || String(doctor._id),
       sessionId: null,
     };
 
@@ -702,7 +701,7 @@ export const getAppointmentByDoctor = async (req, res) => {
   }
 };
 
-// GET REGISTERED USER COUNT
+// GET REGISTERED USER COUNT (Medicare patients)
 export const getRegisteredUserCount = async (req, res) => {
   try {
     const totalUsers = await clerkClient.users.getCount();

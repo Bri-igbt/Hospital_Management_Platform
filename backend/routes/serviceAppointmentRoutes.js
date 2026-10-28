@@ -1,5 +1,6 @@
 import express from "express";
 import { getAuth } from "@clerk/express";
+import { requireAdmin, requireUserOrAdmin } from "../middlewares/adminAuth.js";
 import {
   cancelServiceAppointment,
   confirmServicePayment,
@@ -16,38 +17,15 @@ const serviceAppointmentRouter = express.Router();
 const requireUser = (req, res, next) => {
   const { userId } = getAuth(req);
   if (!userId) {
-    return res.status(401).json({ 
-      success: false, 
-      message: "Unauthorized" 
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
     });
   }
   next();
 };
 
-const requireAdmin = (req, res, next) => {
-  const { userId } = getAuth(req);
-  if (!userId) {
-    return res.status(401).json({ 
-      success: false, 
-      message: "Unauthorized" 
-    });
-  }
-  if (!process.env.MAJOR_ADMIN_ID || userId !== process.env.MAJOR_ADMIN_ID) {
-    return res
-      .status(403)
-      .json({ 
-        success: false, 
-        message: "Admin access only" 
-      });
-  }
-  next();
-};
-
-serviceAppointmentRouter.get(
-  "/", 
-  requireAdmin, 
-  getServiceAppointment
-);
+serviceAppointmentRouter.get("/", requireAdmin, getServiceAppointment);
 
 serviceAppointmentRouter.get(
   "/stats/summary",
@@ -60,39 +38,28 @@ serviceAppointmentRouter.get(
   requireUser,
   getServiceAppointmentByPatient
 );
+serviceAppointmentRouter.post("/", requireUser, createServiceAppointment);
 
-serviceAppointmentRouter.post(
-  "/", 
-  requireUser, 
-  createServiceAppointment
-);
+serviceAppointmentRouter.get("/confirm", confirmServicePayment);
 
 serviceAppointmentRouter.get(
-  "/confirm", 
-  confirmServicePayment
-);
-
-serviceAppointmentRouter.get(
-  "/:id", 
-  requireUser, 
+  "/:id",
+  requireUserOrAdmin,
   getServiceAppointmentById
 );
-
 serviceAppointmentRouter.put(
-  "/:id", 
-  requireUser, 
+  "/:id",
+  requireUserOrAdmin,
   updateServiceAppointment
 );
-
 serviceAppointmentRouter.post(
   "/:id/cancel",
-  requireUser,
+  requireUserOrAdmin,
   cancelServiceAppointment
 );
-
 serviceAppointmentRouter.post(
-  "/:id", 
-  requireUser, 
+  "/:id",
+  requireUserOrAdmin,
   cancelServiceAppointment
 );
 

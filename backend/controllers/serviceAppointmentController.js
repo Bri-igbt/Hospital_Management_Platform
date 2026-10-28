@@ -15,7 +15,6 @@ const CURRENCY = (process.env.PAYMENT_CURRENCY || "ngn").toLowerCase();
 const GENDERS = ["Male", "Female", "Other"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-
 const safeNumber = (val) => {
   if (val === undefined || val === null || val === "") return null;
   const n = Number(val);
@@ -37,10 +36,8 @@ const getUserId = (req) => {
   }
 };
 
-const isAdmin = (userId) =>
-  Boolean(userId) &&
-  Boolean(process.env.MAJOR_ADMIN_ID) &&
-  userId === process.env.MAJOR_ADMIN_ID;
+const isAdmin = (req) => req.isAdmin === true;
+const getActorId = (req) => getUserId(req) || req.adminUserId || null;
 
 const buildFrontendBase = (req) => {
   const env = process.env.FRONTEND_URL;
@@ -384,7 +381,6 @@ export const createServiceAppointment = async (req, res) => {
       appointment: created,
       checkoutUrl: session.url || null,
     });
-
   } catch (error) {
     console.error("createServiceAppointment Error:", error);
     return res.status(500).json({
@@ -534,7 +530,7 @@ export const getServiceAppointmentById = async (req, res) => {
       });
     }
 
-    const userId = getUserId(req);
+    const userId = getActorId(req);
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -550,7 +546,7 @@ export const getServiceAppointmentById = async (req, res) => {
       });
     }
 
-    if (appt.createdBy !== userId && !isAdmin(userId)) {
+    if (appt.createdBy !== userId && !isAdmin(req)) {
       return res.status(403).json({
         success: false,
         message: "Not authorized",
@@ -581,7 +577,7 @@ export const updateServiceAppointment = async (req, res) => {
       });
     }
 
-    const userId = getUserId(req);
+    const userId = getActorId(req);
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -597,7 +593,7 @@ export const updateServiceAppointment = async (req, res) => {
       });
     }
 
-    const admin = isAdmin(userId);
+    const admin = isAdmin(req);
     if (appt.createdBy !== userId && !admin) {
       return res.status(403).json({
         success: false,
@@ -729,7 +725,7 @@ export const cancelServiceAppointment = async (req, res) => {
       });
     }
 
-    const userId = getUserId(req);
+    const userId = getActorId(req);
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -745,7 +741,7 @@ export const cancelServiceAppointment = async (req, res) => {
       });
     }
 
-    if (appt.createdBy !== userId && !isAdmin(userId)) {
+    if (appt.createdBy !== userId && !isAdmin(req)) {
       return res.status(403).json({
         success: false,
         message: "Not authorized",

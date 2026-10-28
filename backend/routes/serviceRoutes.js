@@ -1,20 +1,77 @@
 import express from "express";
-import multer from "multer";
+import { getAuth } from "@clerk/express";
+import { requireAdmin, requireUserOrAdmin } from "../middlewares/adminAuth.js";
 import {
-  createService,
-  deleteService,
-  getService,
-  getServiceById,
-  updateService,
-} from "../controllers/serviceController.js";
+  cancelServiceAppointment,
+  confirmServicePayment,
+  createServiceAppointment,
+  getServiceAppointment,
+  getServiceAppointmentById,
+  getServiceAppointmentByPatient,
+  getServiceAppointmentStats,
+  updateServiceAppointment,
+} from "../controllers/serviceAppointmentController.js";
 
-const upload = multer({ dest: "/tmp" });
-const serviceRouter = express.Router();
+const serviceAppointmentRouter = express.Router();
 
-serviceRouter.get("/", getService);
-serviceRouter.get("/:id", getServiceById);
-serviceRouter.post("/", upload.single("image"), createService);
-serviceRouter.put("/:id", upload.single("image"), updateService);
-serviceRouter.delete("/:id", deleteService);
+const requireUser = (req, res, next) => {
+  const { userId } = getAuth(req);
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+  next();
+};
 
-export default serviceRouter;
+serviceAppointmentRouter.get(
+  "/", 
+  requireAdmin, 
+  getServiceAppointment
+);
+
+serviceAppointmentRouter.get(
+  "/stats/summary",
+  requireAdmin,
+  getServiceAppointmentStats
+);
+
+serviceAppointmentRouter.get(
+  "/me",
+  requireUser,
+  getServiceAppointmentByPatient
+);
+serviceAppointmentRouter.post(
+  "/", 
+  requireUser, 
+  createServiceAppointment
+);
+
+serviceAppointmentRouter.get(
+  "/confirm", 
+  confirmServicePayment
+);
+
+serviceAppointmentRouter.get(
+  "/:id",
+  requireUserOrAdmin,
+  getServiceAppointmentById
+);
+serviceAppointmentRouter.put(
+  "/:id",
+  requireUserOrAdmin,
+  updateServiceAppointment
+);
+serviceAppointmentRouter.post(
+  "/:id/cancel",
+  requireUserOrAdmin,
+  cancelServiceAppointment
+);
+serviceAppointmentRouter.post(
+  "/:id",
+  requireUserOrAdmin,
+  cancelServiceAppointment
+);
+
+export default serviceAppointmentRouter;

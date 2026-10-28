@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@clerk/backend": "^3.26.4",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^2.1.80",
     "bcryptjs": "^3.0.3",

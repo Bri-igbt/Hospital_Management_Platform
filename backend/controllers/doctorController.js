@@ -70,7 +70,6 @@ const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isSelf = (req, id) =>
   Boolean(req.doctor) && String(req.doctor._id || req.doctor.id) === String(id);
 
-
 // TO CREATE DOCTOR
 export const createDoctor = async (req, res) => {
   try {
@@ -392,10 +391,10 @@ export const deleteDoctor = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!isSelf(req, id)) {
-      return res.status(403).json({
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
         success: false,
-        message: "Not authorized to delete this doctor",
+        message: "Invalid doctor id",
       });
     }
 

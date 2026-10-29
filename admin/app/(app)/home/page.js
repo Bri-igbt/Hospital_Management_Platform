@@ -419,8 +419,8 @@ function MobileDoctorCard({ doc }) {
             src={doc.image}
             alt={doc.name}
             className={s.mobileDoctorImage}
-            width={48}
-            height={48}
+            width={128}
+            height={128}
           />
 
           <div>

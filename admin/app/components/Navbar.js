@@ -26,7 +26,7 @@ import { navbarStyles as ns } from "../assets/dummyStyles.js";
 import logoImg from "@/app/assets/logo.png";
 
 const NAV_ITEMS = [
-  { href: "/home", label: "Dashboard", Icon: Home },
+  { href: "/dashboard", label: "Dashboard", Icon: Home },
   { href: "/add", label: "Add Doctor", Icon: UserPlus },
   { href: "/list", label: "List Doctors", Icon: Users },
   { href: "/appointments", label: "Appointments", Icon: Calendar },
@@ -143,7 +143,7 @@ const Navbar = () => {
   }, [open]);
 
   const handleOpenSignIn = () => {
-    clerk.openSignIn({ forceRedirectUrl: "/home" });
+    clerk.openSignIn({ forceRedirectUrl: "/dashboard" });
   };
 
   const handleSignOut = async () => {

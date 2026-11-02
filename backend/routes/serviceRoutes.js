@@ -1,77 +1,35 @@
 import express from "express";
-import { getAuth } from "@clerk/express";
-import { requireAdmin, requireUserOrAdmin } from "../middlewares/adminAuth.js";
+import multer from "multer";
+import { requireAdmin } from "../middlewares/adminAuth.js";
 import {
-  cancelServiceAppointment,
-  confirmServicePayment,
-  createServiceAppointment,
-  getServiceAppointment,
-  getServiceAppointmentById,
-  getServiceAppointmentByPatient,
-  getServiceAppointmentStats,
-  updateServiceAppointment,
-} from "../controllers/serviceAppointmentController.js";
+  createService,
+  deleteService,
+  getService,
+  getServiceById,
+  updateService,
+} from "../controllers/serviceController.js";
 
-const serviceAppointmentRouter = express.Router();
+const upload = multer({
+  dest: "/tmp",
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith("image/")) {
+      return cb(null, true);
+    }
+    // server.js turns this message into a 400 response
+    return cb(new Error("Only images are allowed"));
+  },
+});
 
-const requireUser = (req, res, next) => {
-  const { userId } = getAuth(req);
-  if (!userId) {
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized",
-    });
-  }
-  next();
-};
+const serviceRouter = express.Router();
 
-serviceAppointmentRouter.get(
-  "/", 
-  requireAdmin, 
-  getServiceAppointment
-);
+// Public
+serviceRouter.get("/", getService);
+serviceRouter.get("/:id", getServiceById);
 
-serviceAppointmentRouter.get(
-  "/stats/summary",
-  requireAdmin,
-  getServiceAppointmentStats
-);
+// Admin only (auth runs before multer so rejected requests never write files)
+serviceRouter.post("/", requireAdmin, upload.single("image"), createService);
+serviceRouter.put("/:id", requireAdmin, upload.single("image"), updateService);
+serviceRouter.delete("/:id", requireAdmin, deleteService);
 
-serviceAppointmentRouter.get(
-  "/me",
-  requireUser,
-  getServiceAppointmentByPatient
-);
-serviceAppointmentRouter.post(
-  "/", 
-  requireUser, 
-  createServiceAppointment
-);
-
-serviceAppointmentRouter.get(
-  "/confirm", 
-  confirmServicePayment
-);
-
-serviceAppointmentRouter.get(
-  "/:id",
-  requireUserOrAdmin,
-  getServiceAppointmentById
-);
-serviceAppointmentRouter.put(
-  "/:id",
-  requireUserOrAdmin,
-  updateServiceAppointment
-);
-serviceAppointmentRouter.post(
-  "/:id/cancel",
-  requireUserOrAdmin,
-  cancelServiceAppointment
-);
-serviceAppointmentRouter.post(
-  "/:id",
-  requireUserOrAdmin,
-  cancelServiceAppointment
-);
-
-export default serviceAppointmentRouter;
+export default serviceRouter;

@@ -46,6 +46,15 @@ const parseJsonArrayField = (field) => {
   return [];
 };
 
+const timeToMinutes = (t = "") => {
+  const m = String(t).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return 0;
+  let h = Number(m[1]) % 12;
+  if (m[3].toUpperCase() === "PM") h += 12;
+  return h * 60 + Number(m[2]);
+};
+
+// "05 Nov 2026 • 10:00 AM"  ->  { "2026-11-05": ["10:00 AM"] }
 function normalizeSlotsToMap(slotStrings = []) {
   const map = {};
 
@@ -75,15 +84,22 @@ function normalizeSlotsToMap(slotStrings = []) {
     map[dateKey].push(timeStr);
   });
 
-  Object.keys(map).forEach((k) => {
-    map[k] = Array.from(new Set(map[k]));
-  });
+  const sorted = {};
+  Object.keys(map)
+    .sort()
+    .forEach((k) => {
+      const uniq = Array.from(new Set(map[k]));
+      if (k !== "unspecified") {
+        uniq.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+      }
+      sorted[k] = uniq;
+    });
 
-  return map;
+  return sorted;
 }
 
 const sanitizePrice = (v) =>
-  Math.max(0, Number(String(v ?? "0").replace(/[^\d.-]/g, "")) || 0);
+  Math.max(0, Number(String(v ?? "0").replace(/[^\d.]/g, "")) || 0);
 
 const parseAvailability = (v) => {
   const s = String(v ?? "available").toLowerCase();
@@ -114,10 +130,15 @@ export const createService = async (req, res) => {
     if (req.file?.path) {
       try {
         const up = await uploadToCloudinary(req.file.path, "services");
-        imageUrl = up?.secure_url || null;
-        imagePublicId = up?.public_id || null;
+        if (!up?.secure_url) throw new Error("No image URL returned");
+        imageUrl = up.secure_url;
+        imagePublicId = up.public_id || null;
       } catch (err) {
         console.error("Cloudinary upload error:", err);
+        return res.status(502).json({
+          success: false,
+          message: "Image upload failed. Please try again.",
+        });
       } finally {
         removeTempFile(req.file.path);
       }
@@ -144,6 +165,7 @@ export const createService = async (req, res) => {
     });
   } catch (error) {
     console.error("CreateService Error:", error);
+    removeTempFile(req.file?.path);
     return res.status(500).json({
       success: false,
       message: "Server Error",
@@ -246,27 +268,42 @@ export const updateService = async (req, res) => {
       updateData.slots = normalizeSlotsToMap(parseJsonArrayField(b.slots));
     }
 
+    const wantsRemove = String(b.removeImage).toLowerCase() === "true";
+
     if (req.file?.path) {
       try {
         const up = await uploadToCloudinary(req.file.path, "services");
+        if (!up?.secure_url) throw new Error("No image URL returned");
 
-        if (up?.secure_url) {
-          updateData.imageUrl = up.secure_url;
-          updateData.imagePublicId = up.public_id || null;
+        updateData.imageUrl = up.secure_url;
+        updateData.imagePublicId = up.public_id || null;
 
-          if (existing.imagePublicId) {
-            try {
-              await deleteFromCloudinary(existing.imagePublicId);
-            } catch (err) {
-              console.warn("Cloudinary delete failed:", err?.message || err);
-            }
+        if (existing.imagePublicId) {
+          try {
+            await deleteFromCloudinary(existing.imagePublicId);
+          } catch (err) {
+            console.warn("Cloudinary delete failed:", err?.message || err);
           }
         }
       } catch (err) {
         console.error("Cloudinary upload error:", err);
+        return res.status(502).json({
+          success: false,
+          message: "Image upload failed. Please try again.",
+        });
       } finally {
         removeTempFile(req.file.path);
       }
+    } else if (wantsRemove) {
+      if (existing.imagePublicId) {
+        try {
+          await deleteFromCloudinary(existing.imagePublicId);
+        } catch (err) {
+          console.warn("Cloudinary delete failed:", err?.message || err);
+        }
+      }
+      updateData.imageUrl = null;
+      updateData.imagePublicId = null;
     }
 
     const updated = await Service.findByIdAndUpdate(id, updateData, {
@@ -281,6 +318,7 @@ export const updateService = async (req, res) => {
     });
   } catch (error) {
     console.error("UpdateService Error:", error);
+    removeTempFile(req.file?.path);
     return res.status(500).json({
       success: false,
       message: "Server Error",
@@ -334,4 +372,3 @@ export const deleteService = async (req, res) => {
     });
   }
 };
-

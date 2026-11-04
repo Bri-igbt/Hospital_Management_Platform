@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { homeDoctorsStyles as s, iconSize } from "../assets/dummyStyles.js";
+import { homeDoctorsStyles as s, iconSize } from "@/app/assets/dummyStyles.js";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight, Medal, MousePointer2Off } from "lucide-react";

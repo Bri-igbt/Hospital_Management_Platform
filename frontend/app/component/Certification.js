@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { certificationStyles as s } from "../assets/dummyStyles.js";
+import { certificationStyles as s } from "@/app/assets/dummyStyles.js";
 import C3 from "@/app/assets/C3.png";
 import C1 from "@/app/assets/C1.png";
 import C2 from "@/app/assets/C2.png";

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { bannerStyles as s } from "../assets/dummyStyles.js";
+import { bannerStyles as s } from "@/app/assets/dummyStyles.js";
 import { Calendar, Clock, Phone, Ribbon, Star, Stethoscope } from "lucide-react";
 import { useRouter } from "next/navigation.js";
 import banner from '@/app/assets/BannerImg.png'

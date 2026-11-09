@@ -1,89 +1,102 @@
 "use client";
 
-import { doctorsPageStyles, doctorsPageStyles as s } from "@/app/assets/dummyStyles.js";
+import { doctorsPageStyles as s } from "@/app/assets/dummyStyles.js";
 import Footer from "@/app/component/Footer.js";
 import Navbar from "@/app/component/Navbar.js";
-import { Search, X } from "lucide-react";
-import Image from "next/image.js";
-import Link from "next/link.js";
-import { useEffect, useMemo, useState } from "react";
+import {
+  ChevronRight,
+  CircleChevronDown,
+  CircleChevronUp,
+  Medal,
+  MousePointer2Off,
+  Search,
+  X,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const page = () => {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const FALLBACK_IMAGE = "/placeholder-doctor.jpg";
+const INITIAL_COUNT = 8;
 
+function isAvailable(d) {
+  if (typeof d.availability === "string") {
+    return d.availability.toLowerCase() === "available";
+  }
+  if (typeof d.available === "boolean") return d.available;
+  return d.availability === true;
+}
+
+function normalizeDoctor(d) {
+  const hasExperience =
+    d.experience !== undefined && d.experience !== null && d.experience !== "";
+
+  return {
+    id: d._id || d.id,
+    name: d.name || "Unknown",
+    specialization: d.specialization || "",
+    image: d.imageUrl || d.image || d.imageSmall || d.imageSrc || "",
+    experience: hasExperience ? String(d.experience) : "",
+    fee: d.fee ?? d.price ?? 0,
+    available: isAvailable(d),
+  };
+}
+
+function DoctorImage({ src, alt, className }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <Image
+      src={failed || !src ? FALLBACK_IMAGE : src}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+      width={500}
+      height={500}
+      quality={90}
+      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+    />
+  );
+}
+
+const Page = () => {
   const [allDoctors, setAllDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch(`${API_BASE}/api/doctors`);
-        const json = await res.json().catch(() => null);
+  const loadDoctors = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/doctors`);
+      const json = await res.json().catch(() => null);
 
-        if (!res.ok) {
-          const msg =
-            (json && json.message) || `Failed to load doctors (${res.status})`;
-          if (mounted) {
-            setError(msg);
-            setAllDoctors([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const items = (json && (json.data || json)) || [];
-        const normalized = (Array.isArray(items) ? items : []).map((d) => {
-          const id = d._id || d.id;
-          const image =
-            d.imageUrl || d.image || d.imageSmall || d.imageSrc || "";
-          let available = true;
-          if (typeof d.availability === "string") {
-            available = d.availability.toLowerCase() === "available";
-          } else if (typeof d.available === "boolean") {
-            available = d.available;
-          } else if (typeof d.availability === "boolean") {
-            available = d.availability;
-          } else {
-            available = d.availability === "Available" || d.available === true;
-          }
-          return {
-            id,
-            name: d.name || "Unknown",
-            specialization: d.specialization || "",
-            image,
-            experience:
-              d.experience ?? d.experience === 0 ? String(d.experience) : "—",
-            fee: d.fee ?? d.price ?? 0,
-            available,
-            raw: d,
-          };
-        });
-
-        if (mounted) {
-          setAllDoctors(normalized);
-          setError("");
-        }
-      } catch (err) {
-        console.error("load doctors error:", err);
-        if (mounted) {
-          setError("Network error while loading doctors.");
-          setAllDoctors([]);
-        }
-      } finally {
-        if (mounted) setLoading(false);
+      if (!res.ok) {
+        setError(
+          (json && json.message) || `Failed to load doctors (${res.status})`
+        );
+        setAllDoctors([]);
+        return;
       }
+
+      const items =
+        json?.data || json?.doctors || (Array.isArray(json) ? json : []);
+      setAllDoctors((Array.isArray(items) ? items : []).map(normalizeDoctor));
+    } catch (err) {
+      console.error("load doctors error:", err);
+      setError("Network error while loading doctors.");
+      setAllDoctors([]);
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [API_BASE]);
+  }, []);
+
+  useEffect(() => {
+    loadDoctors();
+  }, [loadDoctors]);
 
   const filteredDoctors = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -97,52 +110,7 @@ const page = () => {
 
   const displayedDoctors = showAll
     ? filteredDoctors
-    : filteredDoctors.slice(0, 8);
-
-  const retry = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE}/api/doctors`);
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError((json && json.message) || `Failed to load (${res.status})`);
-        setAllDoctors([]);
-        return;
-      }
-      const items = (json && (json.data || json)) || [];
-      const normalized = (Array.isArray(items) ? items : []).map((d) => {
-        const id = d._id || d.id;
-        const image = d.imageUrl || d.image || "";
-        let available = true;
-        if (typeof d.availability === "string") {
-          available = d.availability.toLowerCase() === "available";
-        } else if (typeof d.available === "boolean") {
-          available = d.available;
-        } else {
-          available = d.availability === "Available" || d.available === true;
-        }
-        return {
-          id,
-          name: d.name || "Unknown",
-          specialization: d.specialization || "",
-          image,
-          experience: d.experience ?? "—",
-          fee: d.fee ?? d.price ?? 0,
-          available,
-          raw: d,
-        };
-      });
-      setAllDoctors(normalized);
-      setError("");
-    } catch (e) {
-      console.error(e);
-      setError("Network error while loading doctors.");
-      setAllDoctors([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    : filteredDoctors.slice(0, INITIAL_COUNT);
 
   return (
     <div>
@@ -155,7 +123,7 @@ const page = () => {
           <div className={s.headerContainer}>
             <h1 className={s.headerTitle}>Our Medical Experts</h1>
             <p className={s.headerSubtitle}>
-              Find your ideal doctor ny name or specialization
+              Find your ideal doctor by name or specialization
             </p>
           </div>
 
@@ -172,6 +140,8 @@ const page = () => {
               <Search className={s.searchIcon} />
               {searchTerm.length > 0 && (
                 <button
+                  type="button"
+                  aria-label="Clear search"
                   className={s.clearButton}
                   onClick={() => setSearchTerm("")}
                 >
@@ -185,7 +155,11 @@ const page = () => {
             <div className={s.errorContainer}>
               <div className={s.errorText}>{error}</div>
               <div className="flex items-center justify-center gap-3">
-                <button onClick={retry} className={s.retryButton}>
+                <button
+                  type="button"
+                  onClick={loadDoctors}
+                  className={s.retryButton}
+                >
                   Retry
                 </button>
               </div>
@@ -194,7 +168,7 @@ const page = () => {
 
           {loading ? (
             <div className={s.skeletonGrid}>
-              {Array.from({ length: 8 }).map((_, i) => (
+              {Array.from({ length: INITIAL_COUNT }).map((_, i) => (
                 <div key={i} className={s.skeletonCard}>
                   <div className={s.skeletonImage} />
                   <div className={s.skeletonName} />
@@ -203,7 +177,7 @@ const page = () => {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : error ? null : (
             <div
               className={`${s.doctorsGrid} ${
                 filteredDoctors.length === 0 ? "opacity-70" : "opacity-100"
@@ -211,63 +185,130 @@ const page = () => {
             >
               {displayedDoctors.length > 0 ? (
                 displayedDoctors.map((doctor, index) => (
-                  <div 
+                  <article
                     key={doctor.id || `${doctor.name}-${index}`}
                     className={`${s.doctorCard} ${
                       !doctor.available ? s.doctorCardUnavailable : ""
                     }`}
                     style={{
-                      animationDelay: `${index * 90}ms`
+                      animationDelay: `${Math.min(index, 8) * 90}ms`,
                     }}
-                    role="article"
                   >
                     {doctor.available ? (
-                    <Link
-                      to={`/doctors/${doctor.id}`}
-                      state={{ doctor: doctor.raw || doctor }}
-                      className={s.focusRing}
-                    >
-                      <div className={s.imageContainer}>
-                        <Image
-                          src={doctor.image || "/placeholder-doctor.jpg"}
+                      <Link
+                        href={`/doctors/${doctor.id}`}
+                        className={s.focusRing}
+                      >
+                        <div className={s.imageContainer}>
+                          <DoctorImage
+                            key={doctor.image}
+                            src={doctor.image}
+                            alt={doctor.name}
+                            className={s.doctorImage}
+                          />
+                        </div>
+                      </Link>
+                    ) : (
+                      <div
+                        className={`${s.imageContainer} ${s.imageContainerUnavailable}`}
+                      >
+                        <DoctorImage
+                          key={doctor.image}
+                          src={doctor.image}
                           alt={doctor.name}
-                          loading="lazy"
-                          className={s.doctorImage}
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/placeholder-doctor.jpg";
-                          }}
+                          className={s.doctorImageUnavailable}
                         />
                       </div>
-                    </Link>
-                  ) : (
-                    <div
-                      className={`${s.imageContainer} ${s.imageContainerUnavailable}`}
-                    >
-                      <Image
-                        src={doctor.image || "/placeholder-doctor.jpg"}
-                        alt={doctor.name}
-                        loading="lazy"
-                        className={s.doctorImageUnavailable}
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = "/placeholder-doctor.jpg";
-                        }}
-                      />
-                    </div>
-                  )}
+                    )}
 
-                  <h3></h3>
-                  </div>
+                    <h3 className={s.doctorName}>{doctor.name}</h3>
+                    <p className={s.doctorSpecialization}>
+                      {doctor.specialization}
+                    </p>
+
+                    {doctor.experience && (
+                      <div className={s.experienceBadge}>
+                        <Medal className={s.experienceIcon} />
+                        <span>{doctor.experience} years Experience</span>
+                      </div>
+                    )}
+
+                    {doctor.available ? (
+                      <Link
+                        href={`/doctors/${doctor.id}`}
+                        aria-label={`Book an appointment with ${doctor.name}`}
+                        className={s.bookButton}
+                      >
+                        <ChevronRight className={s.bookButtonIcon} />
+                      </Link>
+                    ) : (
+                      <button disabled className={s.notAvailableButton}>
+                        <MousePointer2Off className={s.notAvailableIcon} />
+                        Not Available
+                      </button>
+                    )}
+                  </article>
                 ))
+              ) : (
+                <div className={s.noResults}>
+                  No doctors found matching your search criteria
+                </div>
               )}
+            </div>
+          )}
+
+          {filteredDoctors.length > INITIAL_COUNT && (
+            <div className={s.showMoreContainer}>
+              <button
+                type="button"
+                onClick={() => setShowAll((prev) => !prev)}
+                className={s.showMoreButton}
+              >
+                {showAll ? (
+                  <>
+                    <CircleChevronUp className={s.showMoreIcon} />
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <CircleChevronDown className={s.showMoreIcon} />
+                    Show More
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
       </div>
       <Footer />
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fade-in 0.9s ease-out; }
+        .animate-fade-in-up { animation: fade-in-up 0.9s ease-out both; }
+        .animate-slide-up { animation: slide-up 0.8s ease-out; }
+
+        @media (max-width: 420px) {
+          .max-w-7xl { padding-left: 10px; padding-right: 10px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          * { animation: none !important; transition: none !important; }
+        }
+      `}</style>
     </div>
   );
 };
 
-export default page;
+export default Page;

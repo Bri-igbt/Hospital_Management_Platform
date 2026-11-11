@@ -1,29 +1,45 @@
-import jwt from 'jsonwebtoken';
-import Doctor from '../models/Doctor.js';
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import jwt from "jsonwebtoken";
+import Doctor from "../models/Doctor.js";
 
 export const doctorAuth = async (req, res, next) => {
-  const authHeader = req.headers.authorization();
+  const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer")) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
       success: false,
-      message: "Doctor not authorized, token missing"
+      message: "Doctor not authorized, token missing",
     });
-  };
+  }
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error("JWT_SECRET is not set");
+    return res.status(500).json({
+      success: false,
+      message: "Server Misconfigured",
+    });
+  }
 
   const token = authHeader.split(" ")[1];
 
+  let payload;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.role && payload.role !== "doctor") {
-      return res.status(403).json({
-        success: false,
-        message: "Access Denied(not a doctor)"
-      });
-    };
+    payload = jwt.verify(token, secret);
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Token invalid or expired",
+    });
+  }
 
+  if (payload.role !== "doctor") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied (not a doctor)",
+    });
+  }
+
+  try {
     const doctor = await Doctor.findById(payload.id).select("-password");
 
     if (!doctor) {
@@ -31,16 +47,15 @@ export const doctorAuth = async (req, res, next) => {
         success: false,
         message: "Doctor not found",
       });
-    };
+    }
 
     req.doctor = doctor;
-    next();
-
+    return next();
   } catch (error) {
-    console.error("Doctor JWT verification failed:", error);
-    return res.status(401).json({
+    console.error("doctorAuth lookup failed:", error);
+    return res.status(500).json({
       success: false,
-      message: "Token Invalid, missing or expired"
+      message: "Server Error",
     });
-  };
+  }
 };

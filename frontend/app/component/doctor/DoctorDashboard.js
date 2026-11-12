@@ -209,6 +209,8 @@ function Avatar({ src, name }) {
       alt={name}
       onError={() => setFailed(true)}
       className={s.cardAvatarImage}
+      width={120}
+      height={120}
     />
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { doctorDetailStyles as s } from "@/app/assets/dummyStyles.js";
 import {
   Calendar,
@@ -12,9 +13,11 @@ import {
   User,
   XCircle,
 } from "lucide-react";
-import Image from "next/image";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+).replace(/\/$/, "");
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const emptyForm = {
   name: "",
@@ -34,6 +37,23 @@ const emptyForm = {
   email: "",
   password: "",
 };
+
+const REQUIRED = [
+  ["name", "name"],
+  ["specialization", "specialization"],
+  ["experience", "experience"],
+  ["qualifications", "qualifications"],
+  ["location", "location"],
+  ["about", "about"],
+  ["fee", "fee"],
+  ["success", "success rate"],
+  ["patients", "patients"],
+  ["rating", "rating"],
+  ["email", "email"],
+  ["password", "password"],
+];
+
+const pad2 = (n) => String(n).padStart(2, "0");
 
 function timeStringToMinutes(t) {
   if (!t) return 0;
@@ -84,29 +104,40 @@ function revokePreview(url) {
   } catch (err) {}
 }
 
-function validate(f) {
-  const req = [
-    "name",
-    "specialization",
-    "experience",
-    "qualifications",
-    "location",
-    "about",
-    "fee",
-    "success",
-    "patients",
-    "rating",
-    "email",
-    "password",
-  ];
+function getMissingFields(f) {
+  const missing = REQUIRED.filter(([key]) => !String(f[key] ?? "").trim()).map(
+    ([, label]) => label
+  );
 
-  for (const k of req) if (!f[k]) return false;
-  if (!f.imageFile) return false;
-  if (!Object.keys(f.schedule).length) return false;
-  return true;
+  if (!f.imageFile) missing.push("image");
+  if (!Object.keys(f.schedule).length) missing.push("at least one slot");
+  return missing;
+}
+
+function DoctorThumb({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className={s.doctorImage + " flex items-center justify-center"}>
+        {(alt || "D").charAt(0)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={s.doctorImage}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 export default function AddDoctorPage() {
+  const { getToken } = useAuth();
+
   const [doctorList, setDoctorList] = useState([]);
   const fileInputRef = useRef(null);
   const previewRef = useRef("");
@@ -133,14 +164,15 @@ export default function AddDoctorPage() {
     return local.toISOString().split("T")[0];
   });
 
+  // Depends on the whole toast object, so a new toast restarts the timer
   useEffect(() => {
     if (!toast.show) return;
     const t = setTimeout(
       () => setToast((prev) => ({ ...prev, show: false })),
-      3000
+      3500
     );
     return () => clearTimeout(t);
-  }, [toast.show]);
+  }, [toast]);
 
   useEffect(() => {
     previewRef.current = form.imagePreview;
@@ -155,6 +187,18 @@ export default function AddDoctorPage() {
   function handleImage(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("error", "Please choose an image file");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      showToast("error", "Image must be 5 MB or smaller");
+      e.target.value = "";
+      return;
+    }
+
     revokePreview(form.imagePreview);
     setForm((p) => ({
       ...p,
@@ -178,7 +222,7 @@ export default function AddDoctorPage() {
       showToast("error", "Cannot add a slot in the past");
       return;
     }
-    const time = `${slotHour}:${slotMinute} ${slotAmpm}`;
+    const time = `${pad2(slotHour)}:${slotMinute} ${slotAmpm}`;
 
     if (slotDate === today) {
       const now = new Date();
@@ -214,12 +258,16 @@ export default function AddDoctorPage() {
 
   async function handleAdd(e) {
     e.preventDefault();
+    if (loading) return;
 
-    if (!validate(form)) {
-      showToast("error", "Fill all fields + upload image + add slot");
+    const missing = getMissingFields(form);
+    if (missing.length) {
+      showToast("error", `Missing: ${missing.join(", ")}`);
       return;
     }
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+
+    const email = form.email.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
       showToast("error", "Enter a valid email address");
       return;
     }
@@ -232,8 +280,13 @@ export default function AddDoctorPage() {
       showToast("error", "Fee must be a valid number");
       return;
     }
-    const r = Number(form.rating);
-    if (Number.isNaN(r) || r < 1 || r > 5) {
+    const successRate = Number(form.success);
+    if (Number.isNaN(successRate) || successRate < 0 || successRate > 100) {
+      showToast("error", "Success rate must be a number from 0 to 100");
+      return;
+    }
+    const rating = Number(form.rating);
+    if (Number.isNaN(rating) || rating < 1 || rating > 5) {
       showToast("error", "Rating must be a number between 1 and 5");
       return;
     }
@@ -241,32 +294,47 @@ export default function AddDoctorPage() {
     setLoading(true);
 
     try {
+      const token = await getToken();
+      if (!token) {
+        showToast("error", "You're signed out. Please sign in again.");
+        return;
+      }
+
       const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("specialization", form.specialization);
-      fd.append("experience", form.experience);
-      fd.append("qualifications", form.qualifications);
-      fd.append("location", form.location);
-      fd.append("about", form.about);
+      fd.append("name", form.name.trim());
+      fd.append("specialization", form.specialization.trim());
+      fd.append("experience", form.experience.trim());
+      fd.append("qualifications", form.qualifications.trim());
+      fd.append("location", form.location.trim());
+      fd.append("about", form.about.trim());
       fd.append("fee", String(fee));
-      fd.append("success", form.success);
-      fd.append("patients", form.patients);
-      fd.append("rating", String(r));
+      fd.append("success", String(successRate));
+      fd.append("patients", form.patients.trim());
+      fd.append("rating", String(rating));
       fd.append("availability", form.availability || "Available");
-      fd.append("email", form.email);
+      fd.append("email", email);
       fd.append("password", form.password);
       fd.append("schedule", JSON.stringify(form.schedule));
       fd.append("image", form.imageFile);
 
+      // Don't set Content-Type: the browser sets the multipart boundary
       const res = await fetch(`${API_BASE}/api/doctors`, {
         method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
 
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        showToast("error", data?.message || `Server error (${res.status})`);
+        let message = data?.message || `Server error (${res.status})`;
+        if (res.status === 401) {
+          message = "Not signed in as an admin. Please sign in again.";
+        } else if (res.status === 403) {
+          message =
+            'Admin access only. Set { "role": "admin" } in your Clerk public metadata.';
+        }
+        showToast("error", message);
         return;
       }
 
@@ -369,7 +437,7 @@ export default function AddDoctorPage() {
 
           <input
             className={s.inputBase}
-            placeholder="Experience"
+            placeholder="Experience (years)"
             value={form.experience}
             onChange={(e) => setForm({ ...form, experience: e.target.value })}
           />
@@ -385,7 +453,7 @@ export default function AddDoctorPage() {
 
           <input
             className={s.inputBase}
-            placeholder="Consultation Fee"
+            placeholder="Consultation Fee (₦)"
             type="number"
             min={0}
             value={form.fee}
@@ -413,14 +481,17 @@ export default function AddDoctorPage() {
 
           <input
             className={s.inputBase}
-            placeholder="Patients"
+            placeholder="Patients (e.g. 1200+)"
             value={form.patients}
             onChange={(e) => setForm({ ...form, patients: e.target.value })}
           />
 
           <input
             className={s.inputBase}
-            placeholder="Success Rate"
+            placeholder="Success Rate (%)"
+            type="number"
+            min={0}
+            max={100}
             value={form.success}
             onChange={(e) => setForm({ ...form, success: e.target.value })}
           />
@@ -503,8 +574,8 @@ export default function AddDoctorPage() {
                 className={s.scheduleTimeSelect}
               >
                 {Array.from({ length: 60 }).map((_, i) => (
-                  <option key={i} value={String(i).padStart(2, "0")}>
-                    {String(i).padStart(2, "0")}
+                  <option key={i} value={pad2(i)}>
+                    {pad2(i)}
                   </option>
                 ))}
               </select>
@@ -569,6 +640,7 @@ export default function AddDoctorPage() {
                 " " +
                 (toast.type === "success" ? s.toastSuccess : s.toastError)
               }
+              role="status"
             >
               {toast.type === "success" ? (
                 <CheckCircle size={22} />
@@ -583,14 +655,12 @@ export default function AddDoctorPage() {
             {doctorList.length ? (
               <div className={s.doctorListGrid}>
                 {doctorList.map((d) => (
-                  <div key={d.id || d._id} className={s.doctorCard}>
+                  <div key={d._id || d.id} className={s.doctorCard}>
                     <div className={s.doctorCardContent}>
-                      <Image
+                      <DoctorThumb
+                        key={d.imageUrl}
                         src={d.imageUrl}
                         alt={d.name}
-                        className={s.doctorImage}
-                        width={120}
-                        height={120}
                       />
 
                       <div>

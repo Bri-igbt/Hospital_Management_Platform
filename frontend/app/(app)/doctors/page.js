@@ -240,6 +240,7 @@ const Page = () => {
                         className={s.bookButton}
                       >
                         <ChevronRight className={s.bookButtonIcon} />
+                        Book Now
                       </Link>
                     ) : (
                       <button disabled className={s.notAvailableButton}>

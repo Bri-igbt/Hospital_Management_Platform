@@ -333,35 +333,33 @@ export const createServiceAppointment = async (req, res) => {
     let session;
     try {
       session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
         mode: "payment",
-        customer_email: email ? String(email) : undefined,
+        customer_email: email || undefined,
         line_items: [
           {
             price_data: {
               currency: CURRENCY,
               product_data: {
-                name: `Service: ${base.serviceName.slice(0, 60)}`,
-                description: `Appointment on ${base.date} at ${formatSlot(
-                  slot
-                )}`,
+                name: `Appointment - ${base.patientName.slice(0, 40)}`,
               },
               unit_amount: Math.round(numericFee * 100),
             },
             quantity: 1,
           },
         ],
-        success_url: `${frontendBase}/service-appointment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontendBase}/service-appointment/cancel`,
+        success_url: `${frontBase}/appointment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontBase}/appointment/cancel`,
         metadata: {
           appointmentId: String(created._id),
-          serviceId: String(svc._id),
-          serviceName: base.serviceName.slice(0, 200),
+          doctorId: String(doctor._id),
+          doctorName: base.doctorName,
+          speciality: base.speciality,
           patientName: base.patientName,
           mobile: base.mobile,
           clerkUserId,
         },
       });
+      
     } catch (stripeErr) {
       console.error("Stripe create session error:", stripeErr);
       await ServiceAppointment.findByIdAndDelete(created._id).catch(() => {});

@@ -333,7 +333,6 @@ export const createAppointment = async (req, res) => {
 
     try {
       session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
         mode: "payment",
         customer_email: email || undefined,
         line_items: [
@@ -360,6 +359,7 @@ export const createAppointment = async (req, res) => {
           clerkUserId,
         },
       });
+      
     } catch (stripeErr) {
       console.error("Stripe create session error:", stripeErr);
 
